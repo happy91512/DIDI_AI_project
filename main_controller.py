@@ -8,12 +8,18 @@ import numpy as np
 import sys
 import cv2
 import time
+import datetime
 from detect import object_set_arg, object_main
 
 
 class VideoThread(QThread):
-    global ring_hour, ring_minute, ring_time
-    ring_hour, ring_minute, ring_time, = 23, 15, 10
+    global ring_year, ring_month, ring_day,ring_hour, ring_minute, ring_time, set_time_sec
+    result = time.localtime(time.time())
+    ring_year = result.tm_year
+    ring_month = result.tm_mon
+    ring_day = result.tm_mday
+    ring_hour, ring_minute, ring_time = 0, 0, 5
+    set_time_sec = 0
     change_pixmap_signal = pyqtSignal(np.ndarray)
     set_time = pyqtSignal(str)
     camera_flag = pyqtSignal(bool)
@@ -33,16 +39,14 @@ class VideoThread(QThread):
         if ret:
             self.camera_flag.emit(True)
             arg_list = list(object_set_arg(cap))
-            # print(len(self.arg_list)) labels,input_height,input_width,times,check_wakeup,alarm_clock
+            # print(len(self.arg_list)) labels,input_height,input_width,times,interpreter,check_wakeup
         # sleep_time = cap.get(cv2.CAP_PROP_FPS)
         frame_counter = 0   
         check_person_up = False                                                                                                                 
         while self._run_flag:
             ret, frame = cap.read()
             old_arg_list = arg_list.copy()
-            arg_list.append(cap)
-            ala_list = [ring_hour, ring_minute, ring_time]
-            arg_list.extend(ala_list)
+            arg_list.append(cap)    
             if ret:
                 frame_counter += 1
                 frame, get_up = object_main(
@@ -52,14 +56,11 @@ class VideoThread(QThread):
                     arg_list[3],
                     arg_list[4],
                     arg_list[5],
-                    arg_list[6],
-                    arg_list[7],
-                    arg_list[8],
-                    arg_list[9],
-                    arg_list[10],
+                    cap,
+                    set_time_sec,
+                    ring_time,
                     frame_counter,
                 )
-            
                 self.change_pixmap_signal.emit(frame)
             self.set_time.emit(time.strftime("%H:%M", time.localtime()))
             if frame_counter == 7:
@@ -71,14 +72,11 @@ class VideoThread(QThread):
                 # 此處可加入語音辨識
 
             arg_list = old_arg_list.copy()
-        # shut down capture system
         cap.release()
 
     def stop(self):
-        """Sets run flag to False and waits for thread to finish"""
         self._run_flag = False
         self.wait()
-
 
 class App(QtWidgets.QMainWindow):
     def __init__(self):
@@ -86,7 +84,8 @@ class App(QtWidgets.QMainWindow):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         self.setup_control()
-        self.setWindowTitle("Alarm")
+        self.setWindowTitle("智慧懶人鬧鐘--第五組")
+        self.setWindowIcon(QtGui.QIcon('icon.svg'))
         self.disply_width = 640
         self.display_height = 480
         self.set_time_flag = False
@@ -108,30 +107,37 @@ class App(QtWidgets.QMainWindow):
     def setup_control(self):
         self.ui.set_time_Button.clicked.connect(self.time_buttomClicked)
         self.ui.now_time_text.setText(time.strftime("%H:%M", time.localtime()))
+        self.ui.TimeEdit.setMinimumDate(QtCore.QDate(ring_year, ring_month, ring_day))
 
     def time_buttomClicked(self):
         self.set_time_flag = True
-        self.set_time = str(self.ui.timeEdit.dateTime())
+        self.set_time = str(self.ui.TimeEdit.dateTime())
+        #print(self.set_time)
         self.set_time = self.set_time.split(",")
-        global ring_time, ring_hour, ring_minute, check_person_up
+        global ring_year, ring_month, ring_day, ring_time, ring_hour, ring_minute, check_person_up, set_time_sec
         ring_time = self.ui.spinBox.value()
+        ring_year = int(self.set_time[0][-4:])
+        ring_month = int(self.set_time[1])
+        ring_day =  int(self.set_time[2])
         ring_hour = int(self.set_time[3])
         ring_minute = int(self.set_time[4][1:-1])
-        self.ui.history.setText(f"成功設定{ring_hour}點{ring_minute}分的鬧鐘，響鈴{ring_time}分鐘")
+        t = datetime.datetime(ring_year, ring_month, ring_day, ring_hour, ring_minute, 0)
+        set_time_sec = time.mktime(t.timetuple())
+        self.ui.history.setText(f"鬧鐘設定{ring_month}/{ring_day} {ring_hour}點{ring_minute}分，響鈴{ring_time}分鐘")
 
     @pyqtSlot(str)
     def update_time(self, time_text):
         self.ui.now_time_text.setText(time_text)
 
     @pyqtSlot(bool)
-    def update_getup_mes(self):
-        self.ui.history.setText("成功辨識起身，等待語音偵測中...")
-
-    @pyqtSlot(bool)
     def update_mes(self, camera_flag):
         if camera_flag == True:
-            self.ui.history.setText("成功開啟鏡頭，等待動作中...")
+            self.ui.history.setText("成功開啟鏡頭，等待動作中")
             camera_flag = False
+
+    @pyqtSlot(bool)
+    def update_getup_mes(self):
+        self.ui.history.setText("成功辨識起身，等待語音偵測中")
 
     @pyqtSlot(np.ndarray)
     def update_image(self, cv_img):

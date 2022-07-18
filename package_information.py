@@ -1,12 +1,13 @@
-"""Package we need to download in addition:
-                ***PyQt5 (for GUI)***
-                Install by "$ pip install PyQt5"
+"""跑GUI需要安裝的套件:PyQt5
 
-    How to determine whether installed successfully?
-                Establish an .py file like the code below:"""
+一樣打開之前建好的DIGI_AI環境
+輸入pip install PyQt5
+這樣就安裝好啦
 
+怎麼看自己有沒有安裝成功?
+創一個.py的python程式檔
+內容如下:"""
 import sys
-
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSlot
